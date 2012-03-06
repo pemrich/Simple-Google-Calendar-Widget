@@ -1,14 +1,19 @@
 === Simple Google Calendar Widget ===
+Author: Nico Boehr (@nicoboehr)
+
+Contributor(s):  Matthew Pemrich (@pemrich)
 Tags: google calendar, google, calendar, widget
-Requires at least: 3.1
-Tested up to: 3.2
-Stable tag: trunk
+Requires at least: Wordpress 3.1
+Tested up to: Wordpress 3.3.1
 
 Displays events from a public Google Calendar as a sidebar widget.
 
 == Description ==
 
-Google offers some HTML snippets to embed your public Google Calendar into your website. These are great, but as soon as you want to make a few adjustments to the styling, that goes beyond changing some colors, they’re useless. Because of that I wrote a very simple widget, that fetches events from a public google calendar and nicely displays them in form of a widget, allowing you to apply all kinds of CSS. The source code should be quite easy to modify.
+Google offers some HTML snippets to embed your public Google Calendar into your website. These are great, but as soon as you want to make a few adjustments to the styling (changes that go beyond changing some colors) they’re useless. Because of that Nico Boehr wrote a very simple widget that fetches events from a public google calendar and nicely displays them in form of a widget, allowing you to apply all kinds of CSS. The source code should be quite easy to modify.
+
+I'm now updating the code with additional features to allow some control over how events appear.
+
 
 == Installation ==
 
@@ -16,6 +21,19 @@ Google offers some HTML snippets to embed your public Google Calendar into your 
 2. As soon as you activated the plugin, you should see a new widget under Design › Widgets. Just drag it into your sidebar.
 3. Fill out all the necessary configuration fields. Under Calendar ID enter the calendar ID displayed by Google Calendar. You can find it by going to Calendar settings › Calendars, clicking on the appropriate calendar, scrolling all the way down to "Calendar address". There’s your calendar id.
 4. You’re done!
+
+
+== ToDo ==
+
+* Add remarks to the code to explain what it's doing.
+* Add features to allow custom formatting of dates and times.
+    * In-code
+    * In Widget config
+* Add flexible date ranges for multi-day events.
+* Add features to allow selecting and deselecting specific event information.
+    * In-code
+    * In Widget config
+
 
 == Changelog ==
 
