@@ -5,6 +5,70 @@ Description: Widget that displays events from a public google calendar
 Author: Nico Boehr
 Version: 0.2
 */
+
+function convert_smart_quotes($string) 
+{ 
+    $search = array(chr(145), 
+                    chr(146), 
+                    chr(147), 
+                    chr(148), 
+                    chr(151),
+                    chr(39) . "s"); 
+ 
+    $replace = array('&lsquo;', 
+                     '&rsquo;', 
+                     '&ldquo;', 
+                     '&rdquo;', 
+                     '&mdash;',
+                     '&rsquo;s'); 
+ 
+    return str_replace($search, $replace, $string); 
+}
+
+function get_page_title($url){
+	ini_set('user_agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.11) Gecko/2009060215 Firefox/3.0.11');
+	if( !($data = file_get_contents($url)) ) return false;
+
+	if( preg_match_all("/<title>(.*)<\/title>/s", $data, $t))  {
+		return trim($t[1][0]);
+	} else {
+		return false;
+	}
+}
+
+function clean_up_content($contentString) {
+	$URLStringFormat = '<a href="%s"';
+    if($instance['targetblank']) {
+        $URLStringFormat = $URLStringFormat . ' target="_blank" ';
+    }
+	$URLStringFormat = $URLStringFormat . '>%s</a>';
+	$URLMailStringFormat = '<a href="%s">%s</a>';
+	$editedString = str_replace("\n", " \n ", $contentString);
+	$explodedString = explode(" ", $editedString);
+	foreach($explodedString as $key => $chunk) {
+	    if((parse_url($chunk,PHP_URL_SCHEME) !== NULL) && (parse_url($chunk,PHP_URL_HOST) !== NULL)) {
+	        if(strtolower(parse_url($chunk,PHP_URL_SCHEME)) == 'mailto') {
+	            $emailAddress = parse_url($chunk,PHP_URL_USER) . "@" . parse_url($chunk,PHP_URL_HOST);
+	            $explodedString[$key] = sprintf($URLMailStringFormat,$chunk,$emailAddress);
+	        } else {
+				$chunkPageTitle = get_page_title($chunk);
+	            $explodedString[$key] = sprintf($URLStringFormat,$chunk,$chunkPageTitle);
+	        }
+	    } else {
+	        $explodedString[$key] = convert_smart_quotes($chunk);
+	    }
+	}
+	$parsedString = implode(" ",$explodedString);
+	$explodedString = explode(" \n ",$parsedString);
+	foreach($explodedString as $key => $line) {
+		$line = '<p class="sgcw_paragraph">' . $line . "</p>";
+		$explodedString[$key] = $line;
+	}
+	$parsedString = implode("", $explodedString);
+	
+	return $parsedString;
+}
+
 class Simple_Gcal_Widget extends WP_Widget 
 {
     
@@ -23,9 +87,12 @@ class Simple_Gcal_Widget extends WP_Widget
     
     private function getCalendarUrl($calId, $count)
     {
-        return 'https://www.google.com/calendar/feeds/'.$calId.'/public/full?orderby=starttime&sortorder=ascending&max-results='. $count . '&futureevents=true&singleevents=true';
+        // Where $calId is the calendar ID and $count is the number of events to list
+		// Set in the Widget config pane
+		return 'https://www.google.com/calendar/feeds/'.$calId.'/public/full?orderby=starttime&sortorder=ascending&max-results='. $count . '&futureevents=true&singleevents=true';
     }
     
+	
     private function getData($instance)
     {
         $widgetId = $this->id;
@@ -69,10 +136,12 @@ class Simple_Gcal_Widget extends WP_Widget
             $out[$i] = new StdClass;
             $when = $gd->when->attributes();
             $where = $gd->where->attributes();
+			$content = (string)$e->content;
             $out[$i]->title = (string)$e->title;
             $out[$i]->from = strtotime((string)$when->startTime);
             $out[$i]->to = strtotime((string)$when->endTime);
             $out[$i]->where = (string)$where->valueString;
+			$out[$i]->content = clean_up_content($content);
             foreach($e->link as $l) {
                 $type = $l->attributes()->type;
                 $href = $l->attributes()->href;
@@ -99,15 +168,27 @@ class Simple_Gcal_Widget extends WP_Widget
         $data = $this->getData($instance);
         echo '<ol class="eventlist">';
         foreach($data as $e) {
-            echo '<li><span class="date">', strftime(__('<span class="day">%d</span>%b', 'simple_gcal'), $e->from), '</span>';
-            echo '<a href="', htmlspecialchars($e->htmlLink),'" class="eventlink" ';
-            if($instance['targetblank']) {
-                echo 'target="_blank" ';
-            }
-            if(!empty($e->where)) {
-                echo 'title="', sprintf(__('Location: %s', 'simple_gcal'), htmlspecialchars($e->where)), '" ';
-            }
-            echo '>', htmlspecialchars($e->title), '</a>';
+            echo '<li><span class="date">', strftime(__('<span class="day">%d</span>%b', 'simple_gcal'), $e->from), '</span><h4>';
+			if($instance['title_is_link']) {
+				echo '<a href="', htmlspecialchars($e->htmlLink),'" class="eventlink" ';
+            	if($instance['targetblank']) {
+                	echo 'target="_blank" ';
+            	}
+			
+            	if(!empty($e->where)) {
+                	echo 'title="', sprintf(__('Location: %s', 'simple_gcal'), htmlspecialchars($e->where)), '" ';
+            	}
+            	echo '>', htmlspecialchars($e->title), '</a>';
+			} else {
+				echo htmlspecialchars($e->title);
+			}
+			echo '</h4>';
+        	if(!empty($e->where) && $instance['showlocation']) {
+            	echo '<p class="sgcw_location">', sprintf(__('Location: %s', 'simple_gcal'), htmlspecialchars($e->where)), '</p>';
+        	}
+			if($instance['showcontent'] && $e->content !== '') {
+				echo $e->content;
+			}
             echo '</li>';
         }
         echo '</ol>';
@@ -119,10 +200,14 @@ class Simple_Gcal_Widget extends WP_Widget
     {
         $instance = $old_instance;
         $instance['title'] = strip_tags($new_instance['title']);
+		$instance['title_is_link'] = $new_instance['title_is_link']==1?1:0;
         
         $instance['calendar_id'] = htmlspecialchars($new_instance['calendar_id']);
         
         $instance['targetblank'] = $new_instance['targetblank']==1?1:0;
+		
+		$instance['showcontent'] = $new_instance['showcontent']==1?1:0;
+		$instance['showlocation'] = $new_instance['showlocation']==1?1:0;
         
         $instance['cache_time'] = $new_instance['cache_time'];
         if(is_numeric($new_instance['cache_time']) && $new_instance['cache_time'] > 1) {
@@ -165,6 +250,20 @@ class Simple_Gcal_Widget extends WP_Widget
           <label for="<?php echo $this->get_field_id('targetblank'); ?>"><?php _e('Open event details in new window:', 'simple_gcal'); ?></label> 
           <input name="<?php echo $this->get_field_name('targetblank'); ?>" type="hidden" value="0" />
           <input id="<?php echo $this->get_field_id('targetblank'); ?>" name="<?php echo $this->get_field_name('targetblank'); ?>" type="checkbox" value="1" <?php if($instance['targetblank'] == 1) { echo 'checked="checked" '; } ?>/>
+        </p>
+        <p>
+          <label for="<?php echo $this->get_field_id('title_is_link'); ?>"><?php _e('Event title links to calendar page?', 'simple_gcal'); ?></label> 
+          <input name="<?php echo $this->get_field_name('title_is_link'); ?>" type="hidden" value="0" />
+          <input id="<?php echo $this->get_field_id('title_is_link'); ?>" name="<?php echo $this->get_field_name('title_is_link'); ?>" type="checkbox" value="1" <?php if($instance['title_is_link'] == 1) { echo 'checked="checked" '; } ?>/>
+        </p>
+        <p>
+          <label for="<?php echo $this->get_field_id('showlocation'); ?>"><?php _e('Show event location?', 'simple_gcal'); ?></label> 
+          <input name="<?php echo $this->get_field_name('showlocation'); ?>" type="hidden" value="0" />
+          <input id="<?php echo $this->get_field_id('showlocation'); ?>" name="<?php echo $this->get_field_name('showlocation'); ?>" type="checkbox" value="1" <?php if($instance['showlocation'] == 1) { echo 'checked="checked" '; } ?>/>
+        </p>
+          <label for="<?php echo $this->get_field_id('showcontent'); ?>"><?php _e('Show event description?', 'simple_gcal'); ?></label> 
+          <input name="<?php echo $this->get_field_name('showcontent'); ?>" type="hidden" value="0" />
+          <input id="<?php echo $this->get_field_id('showcontent'); ?>" name="<?php echo $this->get_field_name('showcontent'); ?>" type="checkbox" value="1" <?php if($instance['showcontent'] == 1) { echo 'checked="checked" '; } ?>/>
         </p>
         <p>
           <label for="<?php echo $this->get_field_id('event_count'); ?>"><?php _e('Number of events displayed:', 'simple_gcal'); ?></label> 
