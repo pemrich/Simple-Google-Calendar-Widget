@@ -23,18 +23,6 @@ I'm now updating the code with additional features to allow some control over ho
 4. You’re done!
 
 
-== ToDo ==
-
-* Add remarks to the code to explain what it's doing.
-* Add features to allow custom formatting of dates and times.
-    * In-code
-    * In Widget config
-* Add flexible date ranges for multi-day events.
-* Add features to allow selecting and deselecting specific event information.
-    * In-code
-    * In Widget config
-
-
 == Changelog ==
 
 = 0.1 =
